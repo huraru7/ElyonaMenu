@@ -1,0 +1,20 @@
+name: ElyonaMenu
+version: 1.0.0
+main: world.elyona.menu.ElyonaMenuPlugin
+api-version: "1.21"
+authors: [Elyona World]
+depend: [ElyonaCore, ElyonaEconomy, ElyonaItems]
+
+commands:
+  menu:
+    description: MIMIC端末（統合メニュー）を開く
+    usage: /menu
+  mimicterminal:
+    description: MIMIC端末アイテムを入手する（管理者用）
+    usage: /mimicterminal
+    permission: elyona.admin
+
+permissions:
+  elyona.menu.use:
+    description: MIMIC端末メニューの使用
+    default: true
