@@ -8,10 +8,11 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.plugin.Plugin;
 import world.elyona.core.ElyonaCorePlugin;
 import world.elyona.core.mimic.MimicMessenger;
-import world.elyona.core.rank.RankGui;
 import world.elyona.core.rank.RankTier;
-import world.elyona.core.title.TitleGui;
 import world.elyona.items.ElyonaItemsPlugin;
+import world.elyona.rank.ElyonaRankPlugin;
+import world.elyona.rank.rank.RankGui;
+import world.elyona.rank.title.TitleGui;
 
 public class MenuListener implements Listener {
 
@@ -22,6 +23,7 @@ public class MenuListener implements Listener {
         if (!(event.getWhoClicked() instanceof Player player)) return;
 
         ElyonaCorePlugin core = ElyonaCorePlugin.getInstance();
+        ElyonaRankPlugin rank = ElyonaRankPlugin.getInstance();
         MimicMessenger mimic = core.getMimicMessenger();
 
         switch (event.getRawSlot()) {
@@ -30,21 +32,21 @@ public class MenuListener implements Listener {
                 mimic.sendTo(player, "/pay <プレイヤー名> <金額> で送金できます。");
             }
             case MenuGui.SLOT_DUNGEON_RANK -> {
-                if (!core.getSeasonManager().hasActiveSeason()) {
+                if (!rank.getSeasonManager().hasActiveSeason()) {
                     mimic.sendTo(player, "現在アクティブなシーズンはありません。");
                     return;
                 }
-                RankTier tier = core.getRankManager().getRank(player);
-                long exp = core.getRankManager().getExp(player);
+                RankTier tier = rank.getRankManager().getRank(player);
+                long exp = rank.getRankManager().getExp(player);
                 player.closeInventory();
                 new RankGui(player, tier, exp).open(player);
             }
             case MenuGui.SLOT_TITLE -> {
                 player.closeInventory();
-                core.getTitleManager().getOwnedTitles(player).thenAccept(ownedIds -> {
-                    String activeId = core.getTitleManager().getActive(player);
-                    Bukkit.getScheduler().runTask(core, () ->
-                            new TitleGui(player, ownedIds, core.getTitleLoader(), activeId).open());
+                rank.getTitleManager().getOwnedTitles(player).thenAccept(ownedIds -> {
+                    String activeId = rank.getTitleManager().getActive(player);
+                    Bukkit.getScheduler().runTask(rank, () ->
+                            new TitleGui(player, ownedIds, rank.getTitleLoader(), activeId).open());
                 });
             }
             case MenuGui.SLOT_MIMIC_SELL -> {

@@ -17,6 +17,7 @@ dependencies {
     compileOnly(files("libs/ElyonaCore.jar"))
     compileOnly(files("libs/ElyonaEconomy.jar"))
     compileOnly(files("libs/ElyonaItems.jar"))
+    compileOnly(files("libs/ElyonaRank.jar"))
 }
 
 java {

@@ -3,7 +3,7 @@ version: 1.0.0
 main: world.elyona.menu.ElyonaMenuPlugin
 api-version: "1.21"
 authors: [Elyona World]
-depend: [ElyonaCore, ElyonaEconomy, ElyonaItems]
+depend: [ElyonaCore, ElyonaEconomy, ElyonaItems, ElyonaRank]
 
 commands:
   menu:

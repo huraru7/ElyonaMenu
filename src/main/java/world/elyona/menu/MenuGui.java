@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -11,9 +12,12 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.Plugin;
-import world.elyona.core.ElyonaCorePlugin;
 import world.elyona.core.rank.RankTier;
 import world.elyona.economy.ElyonaEconomyPlugin;
+import world.elyona.rank.ElyonaRankPlugin;
+import world.elyona.items.ElyonaItemsPlugin;
+import world.elyona.items.combat.PlayerStatManager;
+import world.elyona.items.combat.WeaponDisplay;
 
 import java.util.List;
 
@@ -22,7 +26,7 @@ import java.util.List;
  *
  * スロット配置:
  *  [0-8]   上段: 装飾
- *  [9-17]  プレイヤー情報（スロット13）
+ *  [9-17]  プレイヤー情報（スロット13）・ステータス（スロット14）
  *  [18-26] 余白行（装飾のみ）
  *  [27-35] 経済 / ダンジョンランク / 住民ランク / 称号
  *  [36-44] Serathランク / MIMIC売却 / 土地情報 / 予備
@@ -31,6 +35,7 @@ import java.util.List;
 public class MenuGui implements InventoryHolder {
 
     public static final int SLOT_PLAYER_INFO = 13;
+    public static final int SLOT_STATUS = 14;
     public static final int SLOT_ECONOMY = 28;
     public static final int SLOT_DUNGEON_RANK = 30;
     public static final int SLOT_RESIDENT_RANK = 32;
@@ -59,6 +64,7 @@ public class MenuGui implements InventoryHolder {
         }
 
         inventory.setItem(SLOT_PLAYER_INFO, buildPlayerInfo(player));
+        inventory.setItem(SLOT_STATUS, buildStatus(player));
         inventory.setItem(SLOT_ECONOMY, buildEconomy(player));
         inventory.setItem(SLOT_DUNGEON_RANK, buildDungeonRank(player));
         inventory.setItem(SLOT_RESIDENT_RANK, buildLocked("住民ランク"));
@@ -71,11 +77,11 @@ public class MenuGui implements InventoryHolder {
     }
 
     private ItemStack buildPlayerInfo(Player player) {
-        ElyonaCorePlugin core = ElyonaCorePlugin.getInstance();
+        ElyonaRankPlugin rank = ElyonaRankPlugin.getInstance();
         long balance = economyCache(player).getBalance(player.getUniqueId());
-        boolean seasonActive = core.getSeasonManager().hasActiveSeason();
-        RankTier tier = seasonActive ? core.getRankManager().getRank(player) : null;
-        String activeTitle = core.getTitleManager().getActive(player);
+        boolean seasonActive = rank.getSeasonManager().hasActiveSeason();
+        RankTier tier = seasonActive ? rank.getRankManager().getRank(player) : null;
+        String activeTitle = rank.getTitleManager().getActive(player);
 
         ItemStack head = new ItemStack(Material.PLAYER_HEAD);
         SkullMeta meta = (SkullMeta) head.getItemMeta();
@@ -94,6 +100,43 @@ public class MenuGui implements InventoryHolder {
         return head;
     }
 
+    /**
+     * ステータス表示は別画面を開くのではなく、本アイテムのlore（ホバー時のツールチップ）に
+     * HP・攻撃力・防御力を直接記載する。
+     */
+    private ItemStack buildStatus(Player player) {
+        double health = Math.max(0, player.getHealth());
+        double maxHealth = 20.0;
+        var healthAttr = player.getAttribute(Attribute.GENERIC_MAX_HEALTH);
+        if (healthAttr != null) maxHealth = healthAttr.getValue();
+
+        PlayerStatManager statManager = itemsStatManager();
+        Material held = player.getInventory().getItemInMainHand().getType();
+        double baseDamage = WeaponDisplay.getBaseAttackDamage(held);
+        double attackBonus = statManager != null ? statManager.getTotalAttackBonus(player.getUniqueId()) : 0.0;
+        double totalAttack = baseDamage + attackBonus;
+
+        double armor = 0.0;
+        var armorAttr = player.getAttribute(Attribute.GENERIC_ARMOR);
+        if (armorAttr != null) armor = armorAttr.getValue();
+        double defenseBonus = statManager != null ? statManager.getTotalDefenseBonus(player.getUniqueId()) : 0.0;
+        double totalDefense = armor + defenseBonus;
+
+        return makeItem(Material.BOOK, Component.text("ステータス", NamedTextColor.WHITE), List.of(
+                Component.text("HP: " + Math.round(health) + " / " + Math.round(maxHealth), NamedTextColor.RED),
+                Component.text(String.format("攻撃力: %.1f", totalAttack), NamedTextColor.GOLD),
+                Component.text(String.format("防御力: %.1f", totalDefense), NamedTextColor.AQUA)
+        ));
+    }
+
+    private PlayerStatManager itemsStatManager() {
+        Plugin itemsPlugin = Bukkit.getPluginManager().getPlugin("ElyonaItems");
+        if (itemsPlugin instanceof ElyonaItemsPlugin items) {
+            return items.getPlayerStatManager();
+        }
+        return null;
+    }
+
     private ItemStack buildEconomy(Player player) {
         long balance = economyCache(player).getBalance(player.getUniqueId());
         return makeItem(Material.EMERALD, Component.text("経済", NamedTextColor.GREEN), List.of(
@@ -103,13 +146,13 @@ public class MenuGui implements InventoryHolder {
     }
 
     private ItemStack buildDungeonRank(Player player) {
-        ElyonaCorePlugin core = ElyonaCorePlugin.getInstance();
-        if (!core.getSeasonManager().hasActiveSeason()) {
+        ElyonaRankPlugin rank = ElyonaRankPlugin.getInstance();
+        if (!rank.getSeasonManager().hasActiveSeason()) {
             return makeItem(Material.IRON_INGOT, Component.text("ダンジョンランク", NamedTextColor.WHITE), List.of(
                     Component.text("現在アクティブなシーズンはありません", NamedTextColor.GRAY)
             ));
         }
-        RankTier tier = core.getRankManager().getRank(player);
+        RankTier tier = rank.getRankManager().getRank(player);
         return makeItem(tier.iconMaterial, Component.text("ダンジョンランク", NamedTextColor.WHITE), List.of(
                 Component.text(tier.displayName),
                 Component.text("クリックで詳細を開く", NamedTextColor.GRAY)
